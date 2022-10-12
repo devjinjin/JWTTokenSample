@@ -30,16 +30,23 @@ namespace JWTTokenSample.Services.Authentications
 			_userManager = userManager;
 		}
 
+		/// <summary>
+		/// jwt 토큰 생성
+		/// </summary>
+		/// <param name="user"></param>
+		/// <returns></returns>
 		public async Task<string> GetToken(User user)
 		{
 			var signingCredentials = GetSigningCredentials();
 
 			var claims = await GetClaims(user);
 
+			//정보 조합하여 토큰 생성
 			var tokenOptions = GenerateTokenOptions(signingCredentials, claims);
 
 			return _jwtSecurityTokenHandler.WriteToken(tokenOptions);
 		}
+
 
 		private SigningCredentials GetSigningCredentials()
 		{
@@ -65,6 +72,12 @@ namespace JWTTokenSample.Services.Authentications
 			return claims;
 		}
 
+		/// <summary>
+		/// 정보 조합 토큰 생성
+		/// </summary>
+		/// <param name="signingCredentials"></param>
+		/// <param name="claims"></param>
+		/// <returns></returns>
 		private JwtSecurityToken GenerateTokenOptions
 			(SigningCredentials signingCredentials, IEnumerable<Claim> claims)
 		{
@@ -76,9 +89,15 @@ namespace JWTTokenSample.Services.Authentications
 					(_jwtSettings.Expires)),
 				signingCredentials: signingCredentials);
 
+			//expires 최소 시간은 5분임
+
 			return tokenOptions;
 		}
 
+		/// <summary>
+		/// 리프레시 토큰 생성
+		/// </summary>
+		/// <returns></returns>
 		public string GenerateRefreshToken()
 		{
 			var randomNumber = new byte[32];
@@ -89,8 +108,15 @@ namespace JWTTokenSample.Services.Authentications
 			}
 		}
 
+		/// <summary>
+		/// 기존 토큰으로 정보 획득
+		/// </summary>
+		/// <param name="token"></param>
+		/// <returns></returns>
+		/// <exception cref="SecurityTokenException"></exception>
 		public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
 		{
+			//토큰 파라미터 정보
 			var tokenValidationParameters = new TokenValidationParameters
 			{
 				ValidateAudience = true,
@@ -104,10 +130,10 @@ namespace JWTTokenSample.Services.Authentications
 			};
 
 			var tokenHandler = new JwtSecurityTokenHandler();
+			
 			SecurityToken securityToken;
 
-			var principal = tokenHandler.ValidateToken(token,
-				tokenValidationParameters, out securityToken);
+			var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out securityToken);
 
 			var jwtSecurityToken = securityToken as JwtSecurityToken;
 			if (jwtSecurityToken == null ||

@@ -24,6 +24,10 @@ AspNetUsers
 AspNetUserTokens
 
 
+# 리프레시 토큰 만료기간 7일 
+# 극단적인 테스트로 jwt 만료기간 5분(최소가 5분이다)
+
+
 
 
 

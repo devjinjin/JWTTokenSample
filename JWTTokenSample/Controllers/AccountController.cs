@@ -201,6 +201,9 @@ namespace JWTTokenSample.Controllers
 
 		/// <summary>
 		/// 이메일 인증 확인용
+		/// Client통해 이메일/token 정보를 받은후
+		/// 확인여부 전송 
+		/// (클라이언트에서는 결과값에 따른 동작 추가 = 성공시 성공 페이지 또는 Redirect 처리해야함)
 		/// </summary>
 		/// <param name="email"></param>
 		/// <param name="token"></param>
@@ -208,6 +211,7 @@ namespace JWTTokenSample.Controllers
 		[HttpGet("EmailConfirmation")]
 		public async Task<IActionResult> EmailConfirmation([FromQuery] string email, [FromQuery] string token)
 		{
+			
 			var user = await _userManager.FindByEmailAsync(email);
 			if (user == null) {
 				return BadRequest();
