@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JWTTokenSample.Entities", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JWTTokenSample.Shared", "JWTTokenSample.Shared\JWTTokenSample.Shared.csproj", "{9F78D325-7940-43A0-95FC-15160C4D2FB2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EmailService", "EmailService\EmailService.csproj", "{CAAD0CA4-95BE-4377-950A-255B974A7B85}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{9F78D325-7940-43A0-95FC-15160C4D2FB2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9F78D325-7940-43A0-95FC-15160C4D2FB2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9F78D325-7940-43A0-95FC-15160C4D2FB2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CAAD0CA4-95BE-4377-950A-255B974A7B85}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CAAD0CA4-95BE-4377-950A-255B974A7B85}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CAAD0CA4-95BE-4377-950A-255B974A7B85}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CAAD0CA4-95BE-4377-950A-255B974A7B85}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

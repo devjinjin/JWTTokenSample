@@ -1,0 +1,29 @@
+﻿기본 USER 테이블 추가
+
+public class ApplicationDbContext : IdentityDbContext<User>
+
+
+Add-Migration NewMigration
+
+Update-Database
+
+
+//추가된 항목
+AspNetRoleClaims
+
+AspNetRoles
+
+AspNetUserClaims
+
+AspNetUserLogins
+
+AspNetUserRoles
+
+AspNetUsers
+
+AspNetUserTokens
+
+
+
+
+
