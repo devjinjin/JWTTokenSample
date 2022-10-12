@@ -1,1 +1,1 @@
-JWTTokenSample
+닷넷 코어 6.0 API JWT 토큰 인증 샘플
