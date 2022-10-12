@@ -10,4 +10,9 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\JWTTokenSample.Services\JWTTokenSample.Services.csproj" />
+    <ProjectReference Include="..\JWTTokenSample.Shared\JWTTokenSample.Shared.csproj" />
+  </ItemGroup>
+
 </Project>
