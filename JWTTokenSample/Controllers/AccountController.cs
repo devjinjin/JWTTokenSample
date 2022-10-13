@@ -8,6 +8,9 @@ using Microsoft.AspNetCore.WebUtilities;
 
 namespace JWTTokenSample.Controllers
 {
+	/// <summary>
+	/// 
+	/// </summary>
     [Route("api/[controller]")]
     [ApiController]
     public class AccountController : ControllerBase
@@ -16,6 +19,12 @@ namespace JWTTokenSample.Controllers
 		private readonly IServiceManager _service;
 		private readonly IEmailSender _emailSender;
 
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="userManager"></param>
+		/// <param name="service"></param>
+		/// <param name="emailSender"></param>
 		public AccountController(UserManager<User> userManager,
 			IServiceManager service,
 			IEmailSender emailSender)
@@ -26,12 +35,15 @@ namespace JWTTokenSample.Controllers
 		}
 
 		/// <summary>
-		/// 회원가입 = 2단계 인증 포함(이메일)
+		/// 회원가입 
 		/// </summary>
+		/// <remarks>
+		/// 2단계 인증 위한 메일 전송 포함
+		/// </remarks>
 		/// <param name="userForRegistrationDto"></param>
 		/// <returns></returns>
 
-		[HttpPost("register")]
+		[HttpPost("Register")]
 		public async Task<IActionResult> RegisterUser([FromBody] UserForRegistrationDto userForRegistrationDto)
 		{
 			//데이터가 비정상이다
@@ -96,13 +108,45 @@ namespace JWTTokenSample.Controllers
 			return StatusCode(StatusCodes.Status201Created);
 		}
 
+		/// <summary>
+		/// 회원가입 이메일 인증 확인용
+		/// </summary>
+		/// <remarks>
+		/// Client통해 이메일/token 정보를 받은후
+		/// 확인여부 전송 
+		/// (클라이언트에서는 결과값에 따른 동작 추가 = 성공시 성공 페이지 또는 Redirect 처리해야함)
+		/// </remarks>
+		/// <param name="email"></param>
+		/// <param name="token"></param>
+		/// <returns></returns>
+		[HttpGet("Register/Confirmation")]
+		public async Task<IActionResult> EmailConfirmation([FromQuery] string email, [FromQuery] string token)
+		{
+
+			var user = await _userManager.FindByEmailAsync(email);
+			if (user == null)
+			{
+				return BadRequest();
+			}
+
+			var confirmResult = await _userManager.ConfirmEmailAsync(user, token);
+			if (!confirmResult.Succeeded)
+			{
+				return BadRequest();
+			}
+
+			return Ok();
+		}
 
 		/// <summary>
 		/// 로그인 요청
 		/// </summary>
+		/// <remarks>
+		/// 인증번호 메일로 전송
+		/// </remarks>
 		/// <param name="userForAuthenticationDto"></param>
 		/// <returns></returns>
-		[HttpPost("login")]
+		[HttpPost("Login")]
 		public async Task<IActionResult> Login(
 			[FromBody] UserForAuthenticationDto userForAuthenticationDto)
 		{
@@ -199,38 +243,16 @@ namespace JWTTokenSample.Controllers
 			});
 		}
 
-		/// <summary>
-		/// 이메일 인증 확인용
-		/// Client통해 이메일/token 정보를 받은후
-		/// 확인여부 전송 
-		/// (클라이언트에서는 결과값에 따른 동작 추가 = 성공시 성공 페이지 또는 Redirect 처리해야함)
-		/// </summary>
-		/// <param name="email"></param>
-		/// <param name="token"></param>
-		/// <returns></returns>
-		[HttpGet("EmailConfirmation")]
-		public async Task<IActionResult> EmailConfirmation([FromQuery] string email, [FromQuery] string token)
-		{
-			
-			var user = await _userManager.FindByEmailAsync(email);
-			if (user == null) {
-				return BadRequest();
-			}
-
-			var confirmResult = await _userManager.ConfirmEmailAsync(user, token);
-			if (!confirmResult.Succeeded) {
-				return BadRequest();
-			}
-
-			return Ok();
-		}
 
 		/// <summary>
-		/// 로그인 후 2단계인증 확인 용
+		/// 로그인 인증
 		/// </summary>
+		/// <remarks>
+		/// 메일로 전송된 인증번호를 통해 로그인 완료
+		/// </remarks>
 		/// <param name="twoFactorVerificationDto"></param>
 		/// <returns></returns>
-		[HttpPost("TwoStepVerification")]
+		[HttpPost("Login/Verification")]
 		public async Task<IActionResult> TwoStepVerification(
 			[FromBody] TwoFactorVerificationDto twoFactorVerificationDto)
 		{
@@ -283,7 +305,7 @@ namespace JWTTokenSample.Controllers
 		}
 
 		/// <summary>
-		/// 로그인시 (2단계 인증 메일 발송)
+		/// 인증 번호 생성
 		/// </summary>
 		/// <param name="user"></param>
 		/// <returns></returns>
@@ -320,6 +342,113 @@ namespace JWTTokenSample.Controllers
 				Is2StepVerificationRequired = true,
 				Provider = "Email"
 			});
+		}
+
+		/// <summary>
+		/// 패스워드 초기화 요청(메일 전송)
+		/// </summary>
+		/// <remarks>
+		/// 패스워드 초기화를 위한 메일 전송
+		/// </remarks>
+		/// <param name="forgotPasswordDto"></param>
+		/// <returns></returns>
+		[HttpPost("ResetPassword")]
+		public async Task<IActionResult> ForgotPassword( [FromBody] ForgotPasswordDto forgotPasswordDto)
+		{
+			//Body 비정상
+			if (forgotPasswordDto == null || forgotPasswordDto.Email == null
+				|| forgotPasswordDto.ClientURI == null)
+			{
+				return BadRequest("Invalid Request");
+			}
+
+			
+			var user = await _userManager.FindByEmailAsync(forgotPasswordDto.Email);
+			
+			//해당 유저 없음
+			if (user == null) {
+				return BadRequest("Invalid Request");
+			}
+
+			//비번 리셋을 위한 토큰 생성
+			var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+			//url을 만들기 위한 dic
+			var param = new Dictionary<string, string?>
+			{
+				{ "token", token },
+				{ "email", forgotPasswordDto.Email }
+			};
+
+			//url 생성 = 고정 url을 가지고 있다면 client를 통해 받을 필요없음
+			var callback = QueryHelpers.AddQueryString(forgotPasswordDto.ClientURI, param);
+
+			var emailContent = $@"
+				<p>패스워드 초기화 확인</p>			
+				<p> 
+					<a href='{callback}'>
+					   <input type='image' src='https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png' border='0' alt='Submit' style='width: 50px;' />
+					</a>
+				</p>";
+
+			//이메일 메세지 생성
+			var message = new Message(new string[] { user.Email }, "패스워드 초기화 확인",
+				emailContent, null);
+
+			//메일 전송
+			await _emailSender.SendEmailAsync(message);
+
+			return Ok();
+		}
+
+		/// <summary>
+		/// 패스워드 초기화 패스워드 재설정 
+		/// </summary>
+		/// <remarks>
+		/// 이메일로 전송된 토큰사용
+		/// 메일로 전송된 토큰에서 url로 인코딩이 되어있다면 디코딩을 통해 정상문자열로 변경하여야 동작이가능하다
+		/// </remarks>
+		/// <param name="resetPasswordDto"></param>
+		/// <returns></returns>
+		[HttpPost("ResetPassword/Confirmation")]
+		public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto resetPasswordDto)
+		{
+
+			var errorResponse = new ResetPasswordResponseDto
+			{
+				Errors = new string[] { "Reset Password Failed" }
+			};
+
+			//Body 비정상
+			if (!ModelState.IsValid) {
+				return BadRequest(errorResponse);
+			}
+
+			
+			var user = await _userManager.FindByEmailAsync(resetPasswordDto.Email);
+			
+			//해당 유저 없음
+			if (user == null) {
+				return BadRequest(errorResponse);
+			}
+
+			//유저 정보 객체 + 패스워드 리셋 토큰 + 변경할 비번 을 통해 변경시도
+			var resetPassResult = await _userManager.ResetPasswordAsync(user,
+				resetPasswordDto.Token, resetPasswordDto.Password);
+
+
+			//조건에 맞지 않다면 fail
+			if (!resetPassResult.Succeeded)
+			{
+				var errors = resetPassResult.Errors.Select(e => e.Description);
+				return BadRequest(new ResetPasswordResponseDto { Errors = errors });
+			}
+
+			//만약 잠금일자가 있었다면 잠금해제
+			await _userManager.SetLockoutEndDateAsync(user, null);
+
+			//결과값 전송
+			return Ok(new ResetPasswordResponseDto { IsResetPasswordSuccessful = true });
 		}
 	}
 }

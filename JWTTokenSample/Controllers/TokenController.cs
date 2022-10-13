@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace JWTTokenSample.Controllers
 {
+    /// <summary>
+    /// 
+    /// </summary>
     [Route("api/[controller]")]
     [ApiController]
     public class TokenController : ControllerBase
@@ -13,6 +16,11 @@ namespace JWTTokenSample.Controllers
         private readonly UserManager<User> _userManager;
         private readonly IServiceManager _service;
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="userManager"></param>
+        /// <param name="service"></param>
         public TokenController(UserManager<User> userManager,
             IServiceManager service)
         {
@@ -21,7 +29,7 @@ namespace JWTTokenSample.Controllers
         }
 
         /// <summary>
-        /// 리프레시 토큰 동작
+        /// 리프레시 토큰을 통해 토큰 재발급
         /// </summary>
         /// <param name="tokenDto"></param>
         /// <returns></returns>
