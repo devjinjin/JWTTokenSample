@@ -1,5 +1,12 @@
 닷넷 코어 6.0 API JWT 토큰 인증 샘플
 
+DATABASE
+```
+[EF Core(패키지 관리자 콘솔)]
+Add-Migration InitialCreate
+Update-Database
+```
+
 API
 ```
 1. 등록 (이메일 발송)
