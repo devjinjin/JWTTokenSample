@@ -323,7 +323,7 @@ namespace JWTTokenSample.Controllers
 
 			//유저의 인증 방식과 토큰 이 일치하는지 확인
 			var validVerification = await _userManager.VerifyTwoFactorTokenAsync(user,
-				twoFactorVerificationDto.Provider, twoFactorVerificationDto.TwoFactorToken);
+				TokenOptions.DefaultEmailProvider, twoFactorVerificationDto.TwoFactorToken);
 
 			if (!validVerification)
 			{
@@ -344,6 +344,13 @@ namespace JWTTokenSample.Controllers
 		[HttpPost("Login/OTP/Verification")]
 		public async Task<IActionResult> TwoStepOTPVerification([FromBody] GoogleTwoFactorConfirmDto verifyAuthenticator)
 		{
+			if (verifyAuthenticator == null || verifyAuthenticator.VerificationCode == null || verifyAuthenticator.Email == null)
+			{
+				return BadRequest(new AuthResponseDto
+				{
+					ErrorMessage = "Invalid Request"
+				});
+			}
 
 			//email로 유저 찾기
 			var user = await _userManager.FindByEmailAsync(verifyAuthenticator.Email);
@@ -364,7 +371,7 @@ namespace JWTTokenSample.Controllers
 			var verificationCode = verifyAuthenticator.VerificationCode.Replace(" ", string.Empty).Replace("-", string.Empty);
 
 			var is2FaTokenValid = await _userManager.VerifyTwoFactorTokenAsync(
-				user, _userManager.Options.Tokens.AuthenticatorTokenProvider, verificationCode);
+				user, TokenOptions.DefaultAuthenticatorProvider, verificationCode);
 
 			if (!is2FaTokenValid)
 			{

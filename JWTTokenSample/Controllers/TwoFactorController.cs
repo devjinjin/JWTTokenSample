@@ -44,6 +44,91 @@ namespace JWTTokenSample.Controllers
 		}
 
 		/// <summary>
+		/// Email [1] : 2단계 인증 활성와 이메일 인증
+		/// </summary>
+		/// <returns></returns>
+		[HttpGet("Email/Init")]
+		[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+		public async Task<IActionResult> InitEmail()
+		{
+			var userName = User.FindFirst(ClaimTypes.Name)?.Value;
+			if (userName == null)
+			{
+				return null;
+			}
+
+			var user = await _userManager.FindByNameAsync(userName);
+
+			if (user == null)
+			{
+				return null;
+			}
+
+			//토큰 생성
+			var token = await _userManager.GenerateTwoFactorTokenAsync(user, "Email");
+
+			var emailContent = $@"
+			<p>2단계 인증 활성화</p>			
+			<p> 
+				입력 토큰 : {token}
+			</p>";
+
+			//메일 구조 생성
+			var message = new Message(new string[] { user.Email }, "2단계 인증 활성화",
+				emailContent, null);
+
+			//메일 발송
+			await _emailSender.SendEmailAsync(message);
+
+			return Ok();
+		}
+
+
+		/// <summary>
+		/// Email [2] : 이메일 인증으로 2단계 인증 활성화
+		/// </summary>
+		/// <param name="verifyAuthenticator"></param>
+		/// <returns></returns>
+		[HttpPost("Email/Setup")]
+		[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+		public async Task<IActionResult> SetupEmail([FromBody] EmailTwoFactorDto verifyAuthenticator)
+		{
+			
+			if (!ModelState.IsValid)
+				return BadRequest(new AuthResponseDto
+				{
+					ErrorMessage = "Invalid Request"
+				});
+
+			//email로 유저 찾기
+			var user = await _userManager.FindByEmailAsync(verifyAuthenticator.Email);
+			if (user == null)
+			{
+				return BadRequest(new AuthResponseDto
+				{
+					ErrorMessage = "Invalid Request"
+				});
+			}
+
+			//유저의 인증 방식과 토큰 이 일치하는지 확인
+			var validVerification = await _userManager.VerifyTwoFactorTokenAsync(user,
+				 TokenOptions.DefaultEmailProvider, verifyAuthenticator.TwoFactorToken);
+
+			if (!validVerification)
+			{
+				return BadRequest(new AuthResponseDto
+				{
+					ErrorMessage = "Invalid Token Verification"
+				});
+			}
+
+			await _userManager.SetTwoFactorEnabledAsync(user, true);
+
+			return Ok();
+		}
+
+
+		/// <summary>
 		/// 구글 OTP SETUP (초기 OTP 설정을 위한 QRCODE 만들 내용)
 		/// </summary>
 		/// <returns></returns>
