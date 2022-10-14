@@ -1,4 +1,6 @@
-닷넷 코어 6.0 API JWT 토큰 인증 샘플
+닷넷 코어 6.0 API JWT 토큰/Refresh 토큰 샘플 (2Factor 인증 처리 포함)
+
+
 
 DATABASE
 ```
