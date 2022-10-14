@@ -48,7 +48,7 @@ https://dotnetthoughts.net/how-to-implement-2fa-with-aspnet-core-without-identit
 https://dev.to/mohammedahmed/aspnet-core-identity-2fa-with-google-authenticator-i13
 https://chsakell.com/2019/08/18/asp-net-core-identity-series-two-factor-authentication/
 https://github.com/chsakell
-
+https://chsakell.com/2019/08/18/asp-net-core-identity-series-two-factor-authentication/
 Microsoft.AspNetCore.Authentication.Google
 
 

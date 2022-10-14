@@ -298,6 +298,7 @@ namespace JWTTokenSample.Controllers
 		/// </summary>
 		/// <remarks>
 		/// 메일로 전송된 인증번호를 통해 로그인 완료
+		/// 2 단계 인증 사용 시 (Email / Authenticator)
 		/// </remarks>
 		/// <param name="twoFactorVerificationDto"></param>
 		/// <returns></returns>

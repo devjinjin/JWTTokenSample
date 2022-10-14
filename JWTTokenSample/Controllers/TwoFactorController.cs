@@ -13,10 +13,10 @@ using System.Text.Encodings.Web;
 
 namespace JWTTokenSample.Controllers
 {
-	/// <summary>
-	/// 
-	/// </summary>
-	[Route("api/[controller]")]
+    /// <summary>
+    /// 
+    /// </summary>
+    [Route("api/[controller]")]
     [ApiController]
     public class TwoFactorController : ControllerBase
 	{
@@ -44,7 +44,44 @@ namespace JWTTokenSample.Controllers
 		}
 
 		/// <summary>
-		/// Email [1] : 2단계 인증 활성와 이메일 인증
+		/// 인증 정보 표현
+		/// </summary>
+		/// <returns></returns>
+		[HttpGet("Info")]
+		[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+		public async Task<IActionResult> Details()
+		{
+			var userName = User.FindFirst(ClaimTypes.Name)?.Value;
+			if (userName == null)
+			{
+				throw new UnauthorizedAccessException("Invalid Authentication");
+			}
+
+			var user = await _userManager.FindByNameAsync(userName);
+
+			if (user == null)
+			{
+				throw new UnauthorizedAccessException("Invalid Authentication");
+			}
+
+			var logins = await _userManager.GetLoginsAsync(user);
+
+			return Ok(new 
+			{
+				Username = user.UserName,
+				Email = user.Email,
+				EmailConfirmed = user.EmailConfirmed,
+				PhoneNumber = user.PhoneNumber,
+				ExternalLogins = logins.Select(login => login.ProviderDisplayName).ToList(),
+				TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
+				HasAuthenticator = await _userManager.GetAuthenticatorKeyAsync(user) != null,
+				RecoveryCodesLeft = await _userManager.CountRecoveryCodesAsync(user)
+			});
+		}
+
+		
+		/// <summary>
+		/// Email [1] : 2단계 인증 활성화를 위한 이메일 발송
 		/// </summary>
 		/// <returns></returns>
 		[HttpGet("Email/Init")]
@@ -54,14 +91,14 @@ namespace JWTTokenSample.Controllers
 			var userName = User.FindFirst(ClaimTypes.Name)?.Value;
 			if (userName == null)
 			{
-				return null;
+				throw new UnauthorizedAccessException("Invalid Authentication");
 			}
 
 			var user = await _userManager.FindByNameAsync(userName);
 
 			if (user == null)
 			{
-				return null;
+				throw new UnauthorizedAccessException("Invalid Authentication");
 			}
 
 			//토큰 생성
@@ -93,21 +130,17 @@ namespace JWTTokenSample.Controllers
 		[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 		public async Task<IActionResult> SetupEmail([FromBody] EmailTwoFactorDto verifyAuthenticator)
 		{
-			
-			if (!ModelState.IsValid)
-				return BadRequest(new AuthResponseDto
-				{
-					ErrorMessage = "Invalid Request"
-				});
+
+			if (!ModelState.IsValid) {
+
+				throw new InvalidDataException("Invalid Authentication");
+			}
 
 			//email로 유저 찾기
 			var user = await _userManager.FindByEmailAsync(verifyAuthenticator.Email);
 			if (user == null)
 			{
-				return BadRequest(new AuthResponseDto
-				{
-					ErrorMessage = "Invalid Request"
-				});
+				throw new UnauthorizedAccessException("Invalid Authentication");
 			}
 
 			//유저의 인증 방식과 토큰 이 일치하는지 확인
@@ -116,10 +149,7 @@ namespace JWTTokenSample.Controllers
 
 			if (!validVerification)
 			{
-				return BadRequest(new AuthResponseDto
-				{
-					ErrorMessage = "Invalid Token Verification"
-				});
+				throw new UnauthorizedAccessException("Invalid Authentication");
 			}
 
 			await _userManager.SetTwoFactorEnabledAsync(user, true);
@@ -129,7 +159,7 @@ namespace JWTTokenSample.Controllers
 
 
 		/// <summary>
-		/// 구글 OTP SETUP (초기 OTP 설정을 위한 QRCODE 만들 내용)
+		/// 구글 OTP 2차 인증을 위한 OTP 정보출력 (초기 OTP 설정을 위한 QRCODE 만들 내용)
 		/// </summary>
 		/// <returns></returns>
 		[HttpGet("OTP/Init")]
@@ -138,14 +168,14 @@ namespace JWTTokenSample.Controllers
 		{
 			var userName = User.FindFirst(ClaimTypes.Name)?.Value;
 			if (userName == null) {
-				return null;
+				throw new UnauthorizedAccessException("Invalid Authentication");
 			}
 
 			var user = await _userManager.FindByNameAsync(userName);
 
 			if(user == null)
             {
-				return null;
+				throw new UnauthorizedAccessException("Invalid Authentication");
 			}
 
 			var authenticatorDetails = await GetAuthenticatorDetailsAsync(user);
@@ -189,19 +219,19 @@ namespace JWTTokenSample.Controllers
 			var userName = User.FindFirst(ClaimTypes.Name)?.Value;
 			if (userName == null)
 			{
-				return BadRequest("error");
+				throw new UnauthorizedAccessException("Invalid Authentication");
 			}
 
 			var user = await _userManager.FindByNameAsync(userName);
 
 			if (user == null)
 			{
-				return BadRequest("error");
+				throw new UnauthorizedAccessException("Invalid Authentication");
 			}
 
 			if (!ModelState.IsValid || verifyAuthenticator == null || verifyAuthenticator.VerificationCode == null)
 			{
-				return BadRequest("error");
+				throw new BadHttpRequestException("error");
 			}
 
 			var verificationCode = verifyAuthenticator.VerificationCode.Replace(" ", string.Empty).Replace("-", string.Empty);
@@ -211,7 +241,7 @@ namespace JWTTokenSample.Controllers
 
 			if (!is2FaTokenValid)
 			{
-				return BadRequest("error");
+				throw new BadHttpRequestException("error");
 			}
 
 			await _userManager.SetTwoFactorEnabledAsync(user, true);
@@ -265,6 +295,156 @@ namespace JWTTokenSample.Controllers
 				_urlEncoder.Encode("Changzakso"),
 				_urlEncoder.Encode(email),
 				unformattedKey);
+		}
+
+		/// <summary>
+		/// OTP [3] : OTP 인증 비활성화  
+		/// </summary>
+		/// <returns></returns>
+		/// <exception cref="UnauthorizedAccessException"></exception>
+		[HttpPost("OTP/Reset")]
+		[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+		public async Task<IActionResult> ResetAuthenticator()
+		{
+			var userName = User.FindFirst(ClaimTypes.Name)?.Value;
+			if (userName == null)
+			{
+				throw new UnauthorizedAccessException("Invalid Authentication");
+			}
+
+			var user = await _userManager.FindByNameAsync(userName);
+
+			if (user == null)
+			{
+				throw new UnauthorizedAccessException("Invalid Authentication");
+			}
+
+			await _userManager.SetTwoFactorEnabledAsync(user, false);
+			await _userManager.ResetAuthenticatorKeyAsync(user);
+
+
+			return Ok();
+		}
+
+		/// <summary>
+		/// 2단계 인증 전체 비활성화
+		/// </summary>
+		/// <returns></returns>
+		[HttpPost("Disable")]
+		[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+		public async Task<IActionResult> Disable2FA()
+		{
+			var user = await _userManager.GetUserAsync(User);
+
+			if (!await _userManager.GetTwoFactorEnabledAsync(user))
+			{
+				//활성화 처리가 안되어 있지만 Ok 
+				return Ok();
+			}
+
+			//2단계 인증 비활성화
+			_ = await _userManager.SetTwoFactorEnabledAsync(user, false);
+
+			return Ok();
+		}
+
+		/// <summary>
+		/// OTP : 새로운 리커버리 코드를 얻어온다
+		/// </summary>
+		/// <returns></returns>
+		/// <exception cref="BadHttpRequestException"></exception>
+		[HttpPost("OTP/NewRecoveryCode")]
+		[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+		public async Task<IActionResult> GenerateRecoveryCodes()
+		{
+			var userName = User.FindFirst(ClaimTypes.Name)?.Value;
+			if (userName == null)
+			{
+				throw new UnauthorizedAccessException("Invalid Authentication");
+			}
+
+			var user = await _userManager.FindByNameAsync(userName);
+
+			if (user == null)
+			{
+				throw new UnauthorizedAccessException("Invalid Authentication");
+			}
+
+			var isTwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user);
+
+			if (!isTwoFactorEnabled)
+			{
+				throw new BadHttpRequestException("2단계 인증 비활성화 상태이다");
+			}
+
+			var recoveryCodes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+
+			return Ok(recoveryCodes);
+		}
+
+		/// <summary>
+		/// OTP : 복구 코드를 통해 로그인처리를 한다
+		/// OTP 초기화 안내처리 Client에서 
+		/// </summary>
+		/// <param name="model"></param>
+		/// <returns></returns>
+		/// <exception cref="BadHttpRequestException"></exception>
+		/// <exception cref="UnauthorizedAccessException"></exception>
+		[HttpPost("OTP/RecoveryCode")]
+		public async Task<IActionResult> LoginWithRecoveryCode([FromBody] GoogleTwoFactorRecovery model)
+		{
+			if (!ModelState.IsValid)
+			{
+				throw new BadHttpRequestException("값이 올바르지 않다");
+			}
+
+			var user = await _userManager.FindByNameAsync(model.Email);
+
+			if (user == null)
+			{
+				throw new UnauthorizedAccessException("Invalid Authentication");
+
+			}
+
+			var recoveryUser = await _userManager.RedeemTwoFactorRecoveryCodeAsync(user, model.RecoveryCode);
+
+			if (!recoveryUser.Succeeded)
+			{
+				var error = recoveryUser.Errors.FirstOrDefault();
+				if (error == null) {
+					throw new UnauthorizedAccessException("Recovery Error");
+				}
+				var errorStr = error.Description;
+				throw new UnauthorizedAccessException(errorStr);
+			}
+
+			//유저 토큰 생성
+			var token = await _service.AccountService.GetToken(user);
+
+			//리프레시 토큰 생성
+			user.RefreshToken = _service.AccountService.GenerateRefreshToken();
+
+			//리프레시 토큰 만료기간
+			user.RefreshTokenExpiryTime = DateTime.Now.AddDays(7);
+
+			//유저 정보 업데이트
+			await _userManager.UpdateAsync(user);
+
+			//인증 실패 갯수 초기화
+			await _userManager.ResetAccessFailedCountAsync(user);
+
+			//2단계 인증을 사용을 하고 있는지
+			var _is2StepVerificationRequired = await _userManager.GetTwoFactorEnabledAsync(user);
+
+			//결과값 리턴
+			return Ok(new AuthResponseDto
+			{
+				IsAuthSuccessful = true,
+				Token = token,
+				RefreshToken = user.RefreshToken,
+				Is2StepVerificationRequired = _is2StepVerificationRequired,
+				Provider = TokenOptions.DefaultAuthenticatorProvider
+			});
 		}
 	}
 }
