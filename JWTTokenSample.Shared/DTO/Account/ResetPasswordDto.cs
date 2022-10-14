@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace JWTTokenSample.Shared.DTO
+namespace JWTTokenSample.Shared.DTO.Account
 {
     public class ResetPasswordDto
 	{

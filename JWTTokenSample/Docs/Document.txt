@@ -40,6 +40,16 @@ AspNetUserTokens
 
 7. 초기화 토큰을 통한 비밀번호 변경 
 
+#구글 OTP 인증 추가 (참고)
+
+https://github.com/chsakell/aspnet-core-identity/tree/two-factor-authentication/IdentityServer/Filters
+https://github.com/chsakell/aspnet-core-identity/tree/two-factor-authentication
+https://dotnetthoughts.net/how-to-implement-2fa-with-aspnet-core-without-identity/
+https://dev.to/mohammedahmed/aspnet-core-identity-2fa-with-google-authenticator-i13
+https://chsakell.com/2019/08/18/asp-net-core-identity-series-two-factor-authentication/
+https://github.com/chsakell
+
+Microsoft.AspNetCore.Authentication.Google
 
 
 

@@ -2,15 +2,18 @@
 using JWTTokenSample.Entities.Models;
 using JWTTokenSample.Services;
 using JWTTokenSample.Shared.DTO;
+using JWTTokenSample.Shared.DTO.Account;
+using JWTTokenSample.Shared.DTO.Auth;
+using JWTTokenSample.Shared.DTO.TwoFactor;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 
 namespace JWTTokenSample.Controllers
 {
-	/// <summary>
-	/// 
-	/// </summary>
+    /// <summary>
+    /// 
+    /// </summary>
     [Route("api/[controller]")]
     [ApiController]
     public class AccountController : ControllerBase
@@ -18,14 +21,14 @@ namespace JWTTokenSample.Controllers
 		private readonly UserManager<User> _userManager;
 		private readonly IServiceManager _service;
 		private readonly IEmailSender _emailSender;
-
 		/// <summary>
 		/// 
 		/// </summary>
 		/// <param name="userManager"></param>
 		/// <param name="service"></param>
 		/// <param name="emailSender"></param>
-		public AccountController(UserManager<User> userManager,
+		public AccountController(
+			UserManager<User> userManager,
 			IServiceManager service,
 			IEmailSender emailSender)
 		{
@@ -39,6 +42,8 @@ namespace JWTTokenSample.Controllers
 		/// </summary>
 		/// <remarks>
 		/// 2단계 인증 위한 메일 전송 포함
+		/// 인증방법 선택
+		/// 
 		/// </remarks>
 		/// <param name="userForRegistrationDto"></param>
 		/// <returns></returns>
@@ -66,8 +71,8 @@ namespace JWTTokenSample.Controllers
 				return BadRequest(new ResponseDto { Errors = errors });
 			}
 
-			//2단계인증 활성화 등록 (안할거면 false)
-			await _userManager.SetTwoFactorEnabledAsync(user, true);
+			//2단계인증 활성화 등록 초기는 False
+			await _userManager.SetTwoFactorEnabledAsync(user, false);
 
 			//이메일 인증 토큰 생성
 			var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
@@ -87,12 +92,12 @@ namespace JWTTokenSample.Controllers
 			//메일 내용
 			// callback = 컨텐츠 내용임
 			var emailContent = $@"
-				<p>가입확인</p>			
-				<p> 
-					<a href='{callback}'>
-					   <input type='image' src='https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png' border='0' alt='Submit' style='width: 50px;' />
-					</a>
-				</p>";
+			<p>가입확인</p>			
+			<p> 
+				<a href='{callback}'>
+					<input type='image' src='https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png' border='0' alt='Submit' style='width: 50px;' />
+				</a>
+			</p>";
 
 			//메일 문구 생성
 			var message = new Message(new string[] { user.Email }, "이메일 가입 확인",
@@ -100,13 +105,15 @@ namespace JWTTokenSample.Controllers
 
 			//메일 전송
 			await _emailSender.SendEmailAsync(message);
-
+				
+			
 			//유저 롤 권한 Viewer
 			await _userManager.AddToRoleAsync(user, "User");
 
 			//201 created 결과값
 			return StatusCode(StatusCodes.Status201Created);
 		}
+
 
 		/// <summary>
 		/// 회원가입 이메일 인증 확인용
@@ -115,6 +122,8 @@ namespace JWTTokenSample.Controllers
 		/// Client통해 이메일/token 정보를 받은후
 		/// 확인여부 전송 
 		/// (클라이언트에서는 결과값에 따른 동작 추가 = 성공시 성공 페이지 또는 Redirect 처리해야함)
+		/// confirmType = Email , GoogleOtp
+		/// 기본값 Email
 		/// </remarks>
 		/// <param name="email"></param>
 		/// <param name="token"></param>
@@ -142,7 +151,7 @@ namespace JWTTokenSample.Controllers
 		/// 로그인 요청
 		/// </summary>
 		/// <remarks>
-		/// 인증번호 메일로 전송
+		/// 인증번호 메일로 전송 또는 인증 타입 전달
 		/// </remarks>
 		/// <param name="userForAuthenticationDto"></param>
 		/// <returns></returns>
@@ -211,50 +220,90 @@ namespace JWTTokenSample.Controllers
 			}
 
 			//2단계 인증이 활성화 된경우
-			if (await _userManager.GetTwoFactorEnabledAsync(user)) {
+			if (await _userManager.GetTwoFactorEnabledAsync(user))
+			{
+				//유저의 공급 방식이 Email일 경우
+				var providers = await _userManager.GetValidTwoFactorProvidersAsync(user);
+
+				if (providers.Contains(userForAuthenticationDto.TwoFactorType))
+				{
+					if (userForAuthenticationDto.TwoFactorType == "Authenticator")
+					{
+						return Ok(new AuthResponseDto
+						{
+							Is2StepVerificationRequired = true,
+							Provider = "Authenticator"
+						});
+					}
+					else if (userForAuthenticationDto.TwoFactorType == "Email")
+					{
+						//2단계 인증 확인에 따른 메일 발송(현재여기서는)
+						await TwoStepVerificationSendEmail(user);
+
+						return Ok(new AuthResponseDto
+						{
+							Is2StepVerificationRequired = true,
+							Provider = "Email"
+						});
+
+					}
+				}
+
 
 				//2단계 인증 확인에 따른 메일 발송(현재여기서는)
-				return await GenerateOTPFor2StepVerification(user);
+				await TwoStepVerificationSendEmail(user);
+
+				return Ok(new AuthResponseDto
+				{
+					Is2StepVerificationRequired = true,
+					Provider = "Email"
+				});
 			}
 
 			//2단계 인증이 비활성화 인경우
-
-			//토큰 생성
-			var token = await _service.AccountService.GetToken(user);
-
-			//리프레시 토큰 생성
-			user.RefreshToken = _service.AccountService.GenerateRefreshToken();
-
-			//리프레시 토큰 만료기간 설정
-			user.RefreshTokenExpiryTime = DateTime.Now.AddDays(7);
-
-			//유저 정보 업데이트
-			await _userManager.UpdateAsync(user);
-
-			//로그인 실패 갯수 초기화
-			await _userManager.ResetAccessFailedCountAsync(user);
+			var tokenResult = await GetGenerateUserAuthToken(user);
 
 			//정보값 리턴
-			return Ok(new AuthResponseDto
-			{
-				IsAuthSuccessful = true,
-				Token = token,
-				RefreshToken = user.RefreshToken
-			});
+			return Ok(tokenResult);
+		}
+
+		/// <summary>
+		/// 로그인 인증 메일 발송
+		/// </summary>
+		/// <param name="user"></param>
+		/// <returns></returns>
+		private async Task TwoStepVerificationSendEmail(User user)
+		{
+
+			//토큰 생성
+			var token = await _userManager.GenerateTwoFactorTokenAsync(user, "Email");
+
+			var emailContent = $@"
+			<p>로그인 인증 확인</p>			
+			<p> 
+				입력 토큰 : {token}
+			</p>";
+
+			//메일 구조 생성
+			var message = new Message(new string[] { user.Email }, "로그인 인증 확인",
+				emailContent, null);
+
+			//메일 발송
+			await _emailSender.SendEmailAsync(message);
 		}
 
 
 		/// <summary>
-		/// 로그인 인증
+		/// 로그인 메일 인증
 		/// </summary>
 		/// <remarks>
 		/// 메일로 전송된 인증번호를 통해 로그인 완료
 		/// </remarks>
 		/// <param name="twoFactorVerificationDto"></param>
 		/// <returns></returns>
-		[HttpPost("Login/Verification")]
-		public async Task<IActionResult> TwoStepVerification(
-			[FromBody] TwoFactorVerificationDto twoFactorVerificationDto)
+		[HttpPost("Login/Email/Verification")]
+		public async Task<IActionResult> TwoStepEmailVerification(
+			[FromBody] EmailTwoFactorDto twoFactorVerificationDto)
 		{
 			if (!ModelState.IsValid)
 				return BadRequest(new AuthResponseDto
@@ -264,22 +313,77 @@ namespace JWTTokenSample.Controllers
 
 			//email로 유저 찾기
 			var user = await _userManager.FindByEmailAsync(twoFactorVerificationDto.Email);
-			if (user == null)
+			if (user == null) {
 				return BadRequest(new AuthResponseDto
 				{
 					ErrorMessage = "Invalid Request"
 				});
+			}
+
 
 			//유저의 인증 방식과 토큰 이 일치하는지 확인
 			var validVerification = await _userManager.VerifyTwoFactorTokenAsync(user,
 				twoFactorVerificationDto.Provider, twoFactorVerificationDto.TwoFactorToken);
 
 			if (!validVerification)
+			{
 				return BadRequest(new AuthResponseDto
 				{
 					ErrorMessage = "Invalid Token Verification"
 				});
+			}
+			var resultTokenData = await GetGenerateUserAuthToken(user);
+			return Ok(resultTokenData);
+		}
 
+		/// <summary>
+		/// OTP 로그인 인증 
+		/// </summary>
+		/// <param name="verifyAuthenticator"></param>
+		/// <returns></returns>
+		[HttpPost("Login/OTP/Verification")]
+		public async Task<IActionResult> TwoStepOTPVerification([FromBody] GoogleTwoFactorConfirmDto verifyAuthenticator)
+		{
+
+			//email로 유저 찾기
+			var user = await _userManager.FindByEmailAsync(verifyAuthenticator.Email);
+			if (user == null)
+			{
+				return BadRequest(new AuthResponseDto
+				{
+					ErrorMessage = "Invalid Request"
+				});
+			}
+
+			//2단계 인증을 사용하는지
+
+			//2단계 인증에서 OTP를 사용하는지
+
+			//복구 코드는 존재하는지
+
+			var verificationCode = verifyAuthenticator.VerificationCode.Replace(" ", string.Empty).Replace("-", string.Empty);
+
+			var is2FaTokenValid = await _userManager.VerifyTwoFactorTokenAsync(
+				user, _userManager.Options.Tokens.AuthenticatorTokenProvider, verificationCode);
+
+			if (!is2FaTokenValid)
+			{
+				return BadRequest("error");
+			}
+
+			var resultTokenData = await GetGenerateUserAuthToken(user);
+
+			return Ok(resultTokenData);
+
+		}
+
+		/// <summary>
+		/// 로그인 성공시 토큰 발행
+		/// </summary>
+		/// <param name="user"></param>
+		/// <returns></returns>
+		private async Task<AuthResponseDto> GetGenerateUserAuthToken(User user)
+		{
 			//유저 토큰 생성
 			var token = await _service.AccountService.GetToken(user);
 
@@ -295,53 +399,17 @@ namespace JWTTokenSample.Controllers
 			//인증 실패 갯수 초기화
 			await _userManager.ResetAccessFailedCountAsync(user);
 
+			//2단계 인증을 사용을 하고 있는지
+			var _is2StepVerificationRequired = await _userManager.GetTwoFactorEnabledAsync(user);
+
 			//결과값 리턴
-			return Ok(new AuthResponseDto
+			return new AuthResponseDto
 			{
 				IsAuthSuccessful = true,
 				Token = token,
-				RefreshToken = user.RefreshToken
-			});
-		}
-
-		/// <summary>
-		/// 인증 번호 생성
-		/// </summary>
-		/// <param name="user"></param>
-		/// <returns></returns>
-		private async Task<IActionResult> GenerateOTPFor2StepVerification(User user)
-		{
-			//유저의 공급 방식이 Email일 경우
-			var providers = await _userManager.GetValidTwoFactorProvidersAsync(user);
-			if (!providers.Contains("Email"))
-			{
-				return Unauthorized(new AuthResponseDto
-				{
-					ErrorMessage = "Invalid 2-Step Verification Provider"
-				});
-			}
-			//토큰 생성
-
-			var token = await _userManager.GenerateTwoFactorTokenAsync(user, "Email");
-
-			var emailContent = $@"
-				<p>로그인 인증 확인</p>			
-				<p> 
-					입력 토큰 : {token}
-				</p>";
-
-			//메일 구조 생성
-			var message = new Message(new string[] { user.Email }, "로그인 인증 확인",
-				emailContent, null);
-
-			//메일 발송
-			await _emailSender.SendEmailAsync(message);
-
-			return Ok(new AuthResponseDto
-			{
-				Is2StepVerificationRequired = true,
-				Provider = "Email"
-			});
+				RefreshToken = user.RefreshToken,
+				Is2StepVerificationRequired = _is2StepVerificationRequired
+			};
 		}
 
 		/// <summary>
@@ -424,7 +492,6 @@ namespace JWTTokenSample.Controllers
 				return BadRequest(errorResponse);
 			}
 
-			
 			var user = await _userManager.FindByEmailAsync(resetPasswordDto.Email);
 			
 			//해당 유저 없음

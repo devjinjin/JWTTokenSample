@@ -1,4 +1,4 @@
-﻿namespace JWTTokenSample.Shared.DTO
+﻿namespace JWTTokenSample.Shared.DTO.Auth
 {
     public class RefreshTokenDto
 	{

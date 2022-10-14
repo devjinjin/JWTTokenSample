@@ -19,9 +19,10 @@ namespace JWTTokenSample.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<IActionResult> Test()
         {
-
-
-            return Ok();
+            return await Task.Run(() =>
+            {
+                return Ok();
+            });
         }
     }
 }

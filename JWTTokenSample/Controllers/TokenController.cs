@@ -1,6 +1,7 @@
 ﻿using JWTTokenSample.Entities.Models;
 using JWTTokenSample.Services;
 using JWTTokenSample.Shared.DTO;
+using JWTTokenSample.Shared.DTO.Auth;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 

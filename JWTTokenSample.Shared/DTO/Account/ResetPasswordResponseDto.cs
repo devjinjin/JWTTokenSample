@@ -1,4 +1,4 @@
-﻿namespace JWTTokenSample.Shared.DTO
+﻿namespace JWTTokenSample.Shared.DTO.Account
 {
     public class ResetPasswordResponseDto
 	{
